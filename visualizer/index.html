@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Index Visualizer</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --border: #30363d;
+      --text: #e6edf3; --text2: #8b949e; --accent: #388bfd;
+      --go: #00ADD8; --ts: #3178C6; --green: #3fb950; --red: #f85149;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 16px; font-weight: 600; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; }
+    .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+    .stat-label { color: var(--text2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .go-value { color: var(--go); }
+    .ts-value { color: var(--ts); }
+    .tabs-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .tab-nav { display: flex; border-bottom: 1px solid var(--border); }
+    .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--text2); cursor: pointer; font-size: 14px; padding: 12px 20px; transition: color 0.15s; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { border-bottom-color: var(--accent); color: var(--accent); }
+    .tab-panel { display: none; padding: 24px; }
+    .tab-panel.active { display: block; }
+    .btn { border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; padding: 6px 14px; transition: background 0.15s; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #1f6feb; }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .text2 { color: var(--text2); font-size: 13px; }
+    select, input[type="text"] { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; padding: 6px 10px; outline: none; }
+    select:focus, input[type="text"]:focus { border-color: var(--accent); }
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .chart-card h3 { color: var(--text2); font-size: 12px; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filter-input { flex: 1; max-width: 360px; }
+    table { border-collapse: collapse; width: 100%; }
+    thead th { border-bottom: 1px solid var(--border); color: var(--text2); font-size: 11px; font-weight: 500; padding: 8px 12px; text-align: left; text-transform: uppercase; letter-spacing: 0.05em; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:hover { background: var(--surface2); }
+    td { color: var(--text); font-size: 13px; padding: 8px 12px; }
+    .badge { border-radius: 4px; font-size: 11px; font-weight: 500; padding: 2px 6px; }
+    .badge-go { background: rgba(0,173,216,0.15); color: var(--go); }
+    .badge-ts { background: rgba(49,120,198,0.15); color: var(--ts); }
+    .spinner { border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; height: 28px; width: 28px; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-container { align-items: center; display: flex; gap: 12px; padding: 16px 0; }
+    .search-form { display: flex; gap: 10px; margin-bottom: 20px; }
+    .search-input { flex: 1; font-size: 14px; padding: 8px 12px; }
+    .result-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; padding: 16px; }
+    .result-header { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 10px; }
+    .result-filepath { color: var(--accent); font-size: 13px; font-weight: 500; }
+    .result-score { background: rgba(63,185,80,0.15); border-radius: 4px; color: var(--green); font-size: 11px; font-weight: 600; padding: 2px 8px; }
+    .result-card pre { border-radius: 6px; font-size: 12px; margin: 0; max-height: 300px; overflow: auto; }
+    .result-card pre code { background: none; font-size: 12px; }
+    #umap-plot { min-height: 500px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <span style="font-size:20px">🔍</span>
+      <h1>RAG Index Visualizer</h1>
+    </div>
+    <button class="btn btn-secondary" onclick="refresh()">↻ 更新</button>
+  </header>
+
+  <main>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-chunks">—</div>
+        <div class="stat-label">Total Chunks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-files">—</div>
+        <div class="stat-label">Files</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value go-value" id="stat-go">—</div>
+        <div class="stat-label">Go Chunks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value ts-value" id="stat-ts">—</div>
+        <div class="stat-label">TypeScript Chunks</div>
+      </div>
+    </div>
+
+    <div class="tabs-container">
+      <nav class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('overview', this)">Overview</button>
+        <button class="tab-btn" onclick="switchTab('files', this)">Files</button>
+        <button class="tab-btn" onclick="switchTab('umap', this)">Vector Map</button>
+        <button class="tab-btn" onclick="switchTab('search', this)">Search</button>
+      </nav>
+
+      <div id="tab-overview" class="tab-panel active">
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>言語別チャンク数</h3>
+            <div id="chart-lang" style="height:280px"></div>
+          </div>
+          <div class="chart-card">
+            <h3>ノードタイプ別チャンク数</h3>
+            <div id="chart-nodes" style="height:280px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-files" class="tab-panel">
+        <div class="toolbar">
+          <input type="text" id="file-filter" class="filter-input" placeholder="ファイル名でフィルタ..." oninput="filterFiles()">
+          <span id="file-count-label" class="text2"></span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ファイルパス</th>
+              <th>言語</th>
+              <th style="cursor:pointer;user-select:none" onclick="sortFiles()">チャンク数 ↕</th>
+            </tr>
+          </thead>
+          <tbody id="files-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="tab-umap" class="tab-panel">
+        <div class="toolbar">
+          <button id="umap-btn" class="btn btn-primary" onclick="handleUmapBtn()">Generate Map</button>
+          <button class="btn btn-secondary" onclick="clearUmapCache()">キャッシュ削除</button>
+          <select id="umap-color-by" onchange="rerenderUmap()">
+            <option value="language">言語で色分け</option>
+            <option value="node_type">ノードタイプで色分け</option>
+          </select>
+          <div id="umap-loading" class="loading-container" style="display:none">
+            <div class="spinner"></div>
+            <span id="umap-msg" class="text2"></span>
+          </div>
+        </div>
+        <div id="umap-plot"></div>
+      </div>
+
+      <div id="tab-search" class="tab-panel">
+        <div class="search-form">
+          <input type="text" id="search-query" class="search-input" placeholder="検索クエリ（例: job queue dequeue）" onkeydown="if(event.key==='Enter')doSearch()">
+          <select id="search-lang">
+            <option value="">全言語</option>
+            <option value="go">Go</option>
+            <option value="typescript">TypeScript</option>
+          </select>
+          <button class="btn btn-primary" onclick="doSearch()">検索</button>
+        </div>
+        <div id="search-loading" class="loading-container" style="display:none">
+          <div class="spinner"></div>
+          <span class="text2">検索中（初回はモデルロードで数秒かかります）...</span>
+        </div>
+        <div id="search-results"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let _files = [], _filesSortAsc = false, _umapData = null, _umapPollTimer = null;
+
+    async function api(path, opts = {}) {
+      const r = await fetch(path, opts);
+      if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+      return r.json();
+    }
+
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      btn.classList.add('active');
+      if (name === 'files' && _files.length === 0) loadFiles();
+      if (name === 'umap') checkUmapStatus();
+    }
+
+    async function loadStats() {
+      try {
+        const s = await api('/api/stats');
+        document.getElementById('stat-chunks').textContent = s.total_chunks.toLocaleString();
+        document.getElementById('stat-files').textContent = s.total_files.toLocaleString();
+        document.getElementById('stat-go').textContent = (s.language_breakdown['go'] || 0).toLocaleString();
+        document.getElementById('stat-ts').textContent = (s.language_breakdown['typescript'] || 0).toLocaleString();
+        renderLangChart(s.language_breakdown);
+        renderNodeChart(s.node_type_breakdown);
+      } catch(e) { console.error('stats error', e); }
+    }
+
+    const CHART_LAYOUT = {
+      paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+      font: { color: '#e6edf3', size: 12 },
+      margin: { l: 160, r: 20, t: 10, b: 30 },
+      xaxis: { gridcolor: '#30363d', zerolinecolor: '#30363d' },
+      yaxis: { gridcolor: '#30363d' },
+    };
+    const CHART_CONFIG = { displayModeBar: false, responsive: true };
+
+    function renderLangChart(data) {
+      const entries = Object.entries(data).sort((a,b) => b[1]-a[1]);
+      Plotly.newPlot('chart-lang', [{
+        type: 'bar', orientation: 'h',
+        x: entries.map(e=>e[1]), y: entries.map(e=>e[0]),
+        marker: { color: entries.map(e => e[0]==='go' ? '#00ADD8' : e[0]==='typescript' ? '#3178C6' : '#8b949e') },
+        hovertemplate: '%{y}: %{x:,}<extra></extra>',
+      }], CHART_LAYOUT, CHART_CONFIG);
+    }
+
+    function renderNodeChart(data) {
+      const entries = Object.entries(data).sort((a,b) => b[1]-a[1]).slice(0,10);
+      Plotly.newPlot('chart-nodes', [{
+        type: 'bar', orientation: 'h',
+        x: entries.map(e=>e[1]), y: entries.map(e=>e[0]),
+        marker: { color: '#388bfd' },
+        hovertemplate: '%{y}: %{x:,}<extra></extra>',
+      }], CHART_LAYOUT, CHART_CONFIG);
+    }
+
+    async function loadFiles() {
+      try {
+        _files = await api('/api/files');
+        renderFiles(_files);
+      } catch(e) { console.error('files error', e); }
+    }
+
+    function renderFiles(files) {
+      document.getElementById('file-count-label').textContent = `${files.length.toLocaleString()} 件`;
+      document.getElementById('files-tbody').innerHTML = files.slice(0, 1000).map(f => {
+        const short = f.filepath.replace(/\\/g,'/').split('/').slice(-3).join('/');
+        const badge = f.language === 'go'
+          ? `<span class="badge badge-go">Go</span>`
+          : f.language === 'typescript'
+          ? `<span class="badge badge-ts">TS</span>`
+          : `<span class="badge">${f.language}</span>`;
+        return `<tr title="${f.filepath}"><td>${short}</td><td>${badge}</td><td>${f.chunk_count}</td></tr>`;
+      }).join('');
+    }
+
+    function filterFiles() {
+      const q = document.getElementById('file-filter').value.toLowerCase();
+      renderFiles(q ? _files.filter(f => f.filepath.toLowerCase().includes(q)) : _files);
+    }
+
+    function sortFiles() {
+      _filesSortAsc = !_filesSortAsc;
+      _files.sort((a,b) => _filesSortAsc ? a.chunk_count - b.chunk_count : b.chunk_count - a.chunk_count);
+      filterFiles();
+    }
+
+    const LANG_COLORS = { go: '#00ADD8', typescript: '#3178C6' };
+    const NODE_COLORS = {
+      function_declaration: '#3fb950', method_declaration: '#58a6ff',
+      class_declaration: '#e3b341', interface_declaration: '#bc8cff',
+      type_alias_declaration: '#f0883e', export_statement: '#ffa657',
+      method_definition: '#79c0ff', arrow_function: '#d2a8ff',
+    };
+
+    async function checkUmapStatus() {
+      try {
+        const s = await api('/api/umap/status');
+        if (s.status === 'ready') {
+          document.getElementById('umap-btn').textContent = 'Reload Map';
+          document.getElementById('umap-loading').style.display = 'none';
+          if (!_umapData) await loadUmapData();
+        } else if (s.status === 'computing') {
+          startUmapPolling(s.message);
+        }
+      } catch(e) {}
+    }
+
+    async function handleUmapBtn() {
+      document.getElementById('umap-btn').disabled = true;
+      _umapData = null;
+      try {
+        await api('/api/umap/compute', { method: 'POST' });
+        startUmapPolling('開始中...');
+      } catch(e) {
+        document.getElementById('umap-btn').disabled = false;
+        alert('エラー: ' + e.message);
+      }
+    }
+
+    function startUmapPolling(msg) {
+      document.getElementById('umap-loading').style.display = 'flex';
+      document.getElementById('umap-msg').textContent = msg;
+      document.getElementById('umap-btn').disabled = true;
+      if (_umapPollTimer) clearInterval(_umapPollTimer);
+      _umapPollTimer = setInterval(async () => {
+        try {
+          const s = await api('/api/umap/status');
+          document.getElementById('umap-msg').textContent = s.message;
+          if (s.status === 'ready') {
+            clearInterval(_umapPollTimer);
+            document.getElementById('umap-loading').style.display = 'none';
+            document.getElementById('umap-btn').disabled = false;
+            document.getElementById('umap-btn').textContent = 'Reload Map';
+            await loadUmapData();
+          } else if (s.status === 'error') {
+            clearInterval(_umapPollTimer);
+            document.getElementById('umap-loading').style.display = 'none';
+            document.getElementById('umap-btn').disabled = false;
+            alert('UMAP エラー: ' + s.message);
+          }
+        } catch(e) {}
+      }, 3000);
+    }
+
+    async function loadUmapData() {
+      try {
+        const result = await api('/api/umap');
+        _umapData = result.data;
+        rerenderUmap();
+      } catch(e) { console.error('umap load error', e); }
+    }
+
+    function rerenderUmap() {
+      if (!_umapData) return;
+      const colorBy = document.getElementById('umap-color-by').value;
+      const colorMap = colorBy === 'language' ? LANG_COLORS : NODE_COLORS;
+      const groups = {};
+      for (const p of _umapData) {
+        const key = p[colorBy] || 'unknown';
+        if (!groups[key]) groups[key] = { x:[], y:[], text:[] };
+        groups[key].x.push(p.x);
+        groups[key].y.push(p.y);
+        groups[key].text.push(`<b>${p.short_filepath}</b><br>${p.node_type}:${p.start_line}<br><i>${p.snippet.slice(0,80)}</i>`);
+      }
+      Plotly.newPlot('umap-plot', Object.entries(groups).map(([key, g]) => ({
+        type: 'scatter', mode: 'markers', name: key,
+        x: g.x, y: g.y, text: g.text,
+        hovertemplate: '%{text}<extra></extra>',
+        marker: { size: 4, color: colorMap[key] || '#8b949e', opacity: 0.75 },
+      })), {
+        paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+        font: { color: '#e6edf3' },
+        margin: { l: 40, r: 20, t: 20, b: 40 },
+        xaxis: { gridcolor: '#21262d', zerolinecolor: '#21262d', showticklabels: false },
+        yaxis: { gridcolor: '#21262d', zerolinecolor: '#21262d', showticklabels: false },
+        legend: { bgcolor: 'transparent', bordercolor: '#30363d', borderwidth: 1 },
+        height: 560,
+      }, { responsive: true, displayModeBar: true, modeBarButtonsToRemove: ['toImage'] });
+    }
+
+    async function clearUmapCache() {
+      await fetch('/api/umap/cache', { method: 'DELETE' });
+      _umapData = null;
+      Plotly.purge('umap-plot');
+      document.getElementById('umap-btn').textContent = 'Generate Map';
+      document.getElementById('umap-btn').disabled = false;
+    }
+
+    async function doSearch() {
+      const q = document.getElementById('search-query').value.trim();
+      if (!q) return;
+      const lang = document.getElementById('search-lang').value;
+      const loading = document.getElementById('search-loading');
+      const container = document.getElementById('search-results');
+      loading.style.display = 'flex';
+      container.innerHTML = '';
+      try {
+        const results = await api(`/api/search?q=${encodeURIComponent(q)}&n=10${lang ? '&language='+lang : ''}`);
+        loading.style.display = 'none';
+        if (!results.length) { container.innerHTML = '<p class="text2">結果なし</p>'; return; }
+        container.innerHTML = results.map(r => {
+          const fp = r.filepath.replace(/\\/g,'/').split('/').slice(-3).join('/');
+          const score = r.rerank_score != null ? r.rerank_score.toFixed(4) : '';
+          const badge = r.language === 'go' ? `<span class="badge badge-go">Go</span>` : `<span class="badge badge-ts">TS</span>`;
+          const code = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          return `<div class="result-card">
+            <div class="result-header">
+              <div><span class="result-filepath">${fp}:${r.start_line}-${r.end_line}</span>&nbsp;${badge}&nbsp;<span class="text2" style="font-size:11px">${r.node_type}</span></div>
+              ${score ? `<span class="result-score">${score}</span>` : ''}
+            </div>
+            <pre><code class="language-${r.language === 'typescript' ? 'typescript' : 'go'}">${code}</code></pre>
+          </div>`;
+        }).join('');
+        document.querySelectorAll('#search-results pre code').forEach(el => hljs.highlightElement(el));
+      } catch(e) {
+        loading.style.display = 'none';
+        container.innerHTML = `<p style="color:var(--red)">エラー: ${e.message}</p>`;
+      }
+    }
+
+    function refresh() { loadStats(); }
+    loadStats();
+  </script>
+</body>
+</html>

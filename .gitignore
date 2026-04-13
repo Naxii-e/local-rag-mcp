@@ -1,0 +1,41 @@
+# Claude Code
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Models cache
+models/
+*.gguf
+*.bin
+*.safetensors
+
+# Qdrant data
+qdrant_storage/
+
+# LanceDB runtime data
+lancedb_data/
+
+# Test cache
+.pytest_cache/
+
+# Env
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
