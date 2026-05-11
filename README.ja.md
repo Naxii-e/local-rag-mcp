@@ -103,13 +103,6 @@ claude mcp add --scope user codebase-rag `
 > [!IMPORTANT]
 > 必ず venv の Python（`venv/bin/python` または `venv\Scripts\python.exe`）の**絶対パス**を指定してください。シェル上の `python` は Claude Code が MCP サーバーを起動するときには venv の Python とは限らず、その場合 `lancedb` や `sentence-transformers` 等の `ModuleNotFoundError` になります。
 
-または、`uv run` を使って uv にプロジェクトの環境解決を任せることもできます。
-
-```bash
-claude mcp add --scope user codebase-rag \
-  uv --directory /path/to/local-rag-mcp run python rag_server/server.py
-```
-
 登録結果を確認します。
 
 ```bash

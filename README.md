@@ -103,13 +103,6 @@ claude mcp add --scope user codebase-rag `
 > [!IMPORTANT]
 > Always pass the **absolute path** to the venv's Python (`venv/bin/python` or `venv\Scripts\python.exe`). The bare `python` command in your shell PATH is typically not the venv interpreter when Claude Code launches the MCP server, which results in `ModuleNotFoundError` for `lancedb`, `sentence-transformers`, etc.
 
-Alternatively, use `uv run` so uv resolves the project's environment for you:
-
-```bash
-claude mcp add --scope user codebase-rag \
-  uv --directory /path/to/local-rag-mcp run python rag_server/server.py
-```
-
 Verify the registration:
 
 ```bash
