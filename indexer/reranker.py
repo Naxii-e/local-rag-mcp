@@ -5,13 +5,14 @@ import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 import config
+from indexer import empty_device_cache, resolve_device
 
 
 class Reranker:
     """Score query-document pairs and return top-k by relevance."""
 
     def __init__(self) -> None:
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = resolve_device("RERANK_DEVICE", "EMBED_DEVICE")
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(config.RERANKER_MODEL)
             self.model = AutoModelForSequenceClassification.from_pretrained(
@@ -51,8 +52,7 @@ class Reranker:
             logits = self.model(**inputs, return_dict=True).logits
             scores = logits.view(-1).float().tolist()
             del inputs, logits
-        if self.device != "cpu":
-            torch.cuda.empty_cache()
+        empty_device_cache(self.device)
 
         scored = [
             {**c, "rerank_score": score}

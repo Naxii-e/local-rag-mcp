@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-import os
 
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
 
 import config
+from indexer import empty_device_cache, resolve_device
 
 logger = logging.getLogger(__name__)
 
@@ -30,19 +30,17 @@ class Embedder:
         self.model_name: str = config.EMBED_MODEL
         self.batch_size: int = config.EMBED_BATCH_SIZE
 
-        # device: EMBED_DEVICE env var or CUDA auto-detect
-        embed_device_env = os.environ.get("EMBED_DEVICE")
-        if embed_device_env:
-            self.device: str = embed_device_env
-        elif torch.cuda.is_available():
-            self.device = "cuda"
-        else:
-            self.device = "cpu"
+        # device: EMBED_DEVICE env var, else CUDA → Apple MPS → CPU
+        self.device: str = resolve_device()
 
         if self.device == "cpu":
-            logger.warning("CUDA unavailable, running on CPU (slow).")
-        else:
+            logger.warning("No accelerator available, running on CPU (slow).")
+        elif self.device.startswith("cuda"):
             logger.info("Using CUDA device: %s", torch.cuda.get_device_name(0))
+        elif self.device == "mps":
+            logger.info("Using Apple Silicon MPS device.")
+        else:
+            logger.info("Using device: %s", self.device)
 
         logger.info("Loading embedding model: %s", self.model_name)
 
@@ -78,8 +76,7 @@ class Embedder:
         embeddings = F.normalize(embeddings, p=2, dim=1)
         result = embeddings.cpu().float().tolist()
         del encoded, outputs, embeddings
-        if self.device != "cpu":
-            torch.cuda.empty_cache()
+        empty_device_cache(self.device)
         return result
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
